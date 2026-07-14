@@ -33,9 +33,13 @@ import {
   ActionDropdownItem,
 } from "@/components/shadcn/dropdown";
 import { Modal } from "@/components/shadcn/modal";
+import { CloudFeatureBadge } from "@/components/shared/cloud-feature-badge";
 import { runWithConcurrencyLimit } from "@/lib/concurrency";
 import { testProviderConnection } from "@/lib/provider-helpers";
-import { getScanScheduleCapability } from "@/lib/schedules";
+import {
+  canEditProviderAlias,
+  getScanScheduleCapability,
+} from "@/lib/schedules";
 import { isCloud } from "@/lib/shared/env";
 import { ORG_SETUP_PHASE, ORG_WIZARD_STEP } from "@/types/organizations";
 import { PROVIDER_WIZARD_MODE } from "@/types/provider-wizard";
@@ -291,9 +295,11 @@ export function DataTableRowActions({
   currentScanConfigId = null,
   capability,
 }: DataTableRowActionsProps) {
+  const resolvedCapability = capability ?? getScanScheduleCapability(isCloud());
   const canEditSchedule =
-    (capability ?? getScanScheduleCapability(isCloud())) ===
-    SCAN_SCHEDULE_CAPABILITY.ADVANCED;
+    resolvedCapability === SCAN_SCHEDULE_CAPABILITY.ADVANCED;
+  // Editing a provider alias requires a Prowler Cloud subscription
+  const canEditAlias = canEditProviderAlias(resolvedCapability);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [scheduleState, setScheduleState] = useState<EditScanScheduleState>({
@@ -590,13 +596,28 @@ export function DataTableRowActions({
       )}
       <div className="relative flex items-center justify-end gap-2">
         <ActionDropdown>
-          {canManageProvider && (
-            <ActionDropdownItem
-              icon={<Pencil />}
-              label="Edit Provider Alias"
-              onSelect={() => setIsEditOpen(true)}
-            />
-          )}
+          {canManageProvider &&
+            (canEditAlias ? (
+              <ActionDropdownItem
+                icon={<Pencil />}
+                label="Edit Provider Alias"
+                onSelect={() => setIsEditOpen(true)}
+              />
+            ) : (
+              <ActionDropdownItem
+                icon={<Pencil />}
+                label={
+                  <span className="flex flex-col items-start gap-1">
+                    Edit Provider Alias
+                    <CloudFeatureBadge
+                      label="Requires subscription"
+                      size="sm"
+                    />
+                  </span>
+                }
+                disabled
+              />
+            ))}
           <ActionDropdownItem
             icon={<Timer />}
             label="View Scan Jobs"
